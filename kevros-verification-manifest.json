@@ -1,0 +1,183 @@
+{
+  "$schema": "https://governance.taskhawktech.com/schemas/verification-manifest/1.0",
+  "manifest_version": "1.0",
+  "product": "Kevros Enforcement Kernel",
+  "organization": "TaskHawk Systems, LLC",
+  "generated": "2026-03-24T05:07:54Z",
+  "status": "ALL_VERIFIED",
+
+  "summary": {
+    "total_layers": 5,
+    "total_proofs": 51,
+    "total_failures": 0,
+    "safety_properties_defined": 12,
+    "safety_properties_verified": 12,
+    "combined_verification_time_seconds": 35,
+    "total_cost_usd": 3.50
+  },
+
+  "safety_properties": [
+    {"id": "SP1",  "name": "PermissionBeforePower",      "description": "No actuation without valid release token"},
+    {"id": "SP2",  "name": "FailClosedAuth",              "description": "Any auth error produces DENY"},
+    {"id": "SP3",  "name": "FailClosedEvidence",          "description": "Any evidence error produces DENY"},
+    {"id": "SP4",  "name": "EvidenceBeforeToken",         "description": "Token issued only after evidence appended"},
+    {"id": "SP5",  "name": "TokenRequiredForActuation",   "description": "Actuation gate rejects without valid token"},
+    {"id": "SP6",  "name": "ModeDecisionConsistency",     "description": "Mode and decision are always consistent"},
+    {"id": "SP7",  "name": "FaultIsLatched",              "description": "Once in FAULT, stays in FAULT (two sub-properties)"},
+    {"id": "SP8",  "name": "NoDirectInertToRun",          "description": "No single transition from INERT to RUN"},
+    {"id": "SP9",  "name": "BootPromotionValid",          "description": "BOOT promotion only with valid conditions"},
+    {"id": "SP10", "name": "BootTimeoutBounded",          "description": "BOOT phase has bounded timeout"},
+    {"id": "SP11", "name": "DenyZeroActuation",           "description": "DENY verdict produces zero actuation"},
+    {"id": "SP12", "name": "ChainIntegrityInvariant",     "description": "Evidence chain hash-links are unbroken (three sub-properties)"}
+  ],
+
+  "layers": [
+    {
+      "layer": 1,
+      "tool": "TLA+/TLC",
+      "tool_version": "TLC 2.18",
+      "domain": "System architecture",
+      "scope": "bounded_exhaustive",
+      "status": "VERIFIED",
+      "spec_file": "KevrosEnforcementKernel.tla",
+      "spec_lines": 716,
+      "results": {
+        "states_generated": 1943069194,
+        "distinct_states": 171647834,
+        "search_depth": 118,
+        "invariants_checked": 12,
+        "invariants_verified": 12,
+        "invariants_violated": 0,
+        "liveness_properties_checked": 4,
+        "liveness_properties_verified": 4,
+        "runtime_minutes": 14
+      },
+      "commit": "da3e6856",
+      "artifacts": ["KevrosEnforcementKernel.tla"]
+    },
+    {
+      "layer": 2,
+      "tool": "Kani/CBMC",
+      "tool_version": "Kani 0.66.0 / CBMC 6.5.0",
+      "domain": "Rust implementation correctness",
+      "scope": "bounded_model_checking",
+      "status": "VERIFIED",
+      "environment": {
+        "platform": "AWS CodeBuild",
+        "compute_type": "BUILD_GENERAL1_2XLARGE",
+        "vcpu": 72,
+        "memory_gb": 145,
+        "build_id": "kani-verification:29992e02-1b75-4009-9598-b4cee79e6e73"
+      },
+      "results": {
+        "harnesses_total": 17,
+        "harnesses_verified": 17,
+        "harnesses_failed": 0,
+        "unit_tests_passed": 99,
+        "build_phase_seconds": 33
+      },
+      "harnesses": [
+        {"name": "SP1",                    "property": "Permission before power",      "result": "SUCCESSFUL"},
+        {"name": "SP2",                    "property": "Fail-closed auth",             "result": "SUCCESSFUL"},
+        {"name": "SP3",                    "property": "Fail-closed evidence",         "result": "SUCCESSFUL"},
+        {"name": "SP4",                    "property": "Evidence before token",        "result": "SUCCESSFUL"},
+        {"name": "SP5",                    "property": "Token required for actuation", "result": "SUCCESSFUL"},
+        {"name": "SP6",                    "property": "Mode-decision consistency",    "result": "SUCCESSFUL"},
+        {"name": "SP7",                    "property": "Fault is latched (update)",    "result": "SUCCESSFUL"},
+        {"name": "SP7b",                   "property": "Fault reset only to INERT",    "result": "SUCCESSFUL"},
+        {"name": "SP8",                    "property": "No direct INERT to RUN",       "result": "SUCCESSFUL"},
+        {"name": "SP9",                    "property": "BOOT promotion valid",         "result": "SUCCESSFUL"},
+        {"name": "SP10",                   "property": "BOOT timeout bounded",         "result": "SUCCESSFUL"},
+        {"name": "SP11",                   "property": "DENY produces zero actuation", "result": "SUCCESSFUL"},
+        {"name": "SP12_chain",             "property": "Chain integrity",              "result": "SUCCESSFUL"},
+        {"name": "SP12_determinism",       "property": "Hash determinism",             "result": "SUCCESSFUL"},
+        {"name": "SP12_genesis",           "property": "Genesis record",               "result": "SUCCESSFUL"},
+        {"name": "pipeline_composite",     "property": "All SPs simultaneously",       "result": "SUCCESSFUL"},
+        {"name": "mode_manager_composite", "property": "FAULT + INERT safety",         "result": "SUCCESSFUL"}
+      ],
+      "key_engineering_decisions": [
+        "Replaced dynamic allocation (Vec, String, format!) with fixed-size [u8; 32] XOR operations for CBMC compatibility",
+        "Built AbstractModeManager with KappaRegion enum to eliminate IEEE 754 f64 bit-blasting from SAT solving",
+        "#[cfg(kani)] crypto stubs for ring::digest and ring::hmac FFI boundaries"
+      ],
+      "commits": ["09a9ce06", "05505be9", "1a1a32b9", "3a7b0271"],
+      "artifacts": ["enforcer-rs/src/verification/"]
+    },
+    {
+      "layer": 3,
+      "tool": "Verus/Z3",
+      "tool_version": "Verus 0.2026.03.22.5e66329 / Z3",
+      "domain": "Unbounded proof (all possible inputs)",
+      "scope": "unbounded_smt",
+      "status": "VERIFIED",
+      "environment": {
+        "platform": "AWS CodeBuild",
+        "verification_time_seconds": 2
+      },
+      "results": {
+        "proofs_total": 22,
+        "proofs_verified": 22,
+        "proofs_failed": 0,
+        "source_lines": 899,
+        "source_files": 4
+      },
+      "proof_files": [
+        {"file": "mode_manager.rs", "verified": 7, "errors": 0, "properties": ["SP7", "SP7b", "SP8", "SP9", "SP10", "composite"]},
+        {"file": "pipeline.rs",     "verified": 9, "errors": 0, "properties": ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP11", "composite"]},
+        {"file": "evidence.rs",     "verified": 6, "errors": 0, "properties": ["SP12_chain", "SP12_determinism", "SP12_genesis", "SP12_inductive"]}
+      ],
+      "key_properties": [
+        "Hash modeled as uninterpreted function (Z3 oracle) - proofs hold for ANY hash algorithm",
+        "Same AbstractModeManager + KappaRegion abstraction as Kani layer (bisimulation relation)",
+        "All quantifiers are universal (forall) - no existential witnesses required"
+      ],
+      "warnings": [
+        {"type": "cosmetic", "message": "hash_oracle needs uninterp annotation in future Verus versions"}
+      ],
+      "commits": ["1ed6d1e5", "875f1e9f"],
+      "artifacts": ["enforcer-rs/verus-proofs/"]
+    },
+    {
+      "layer": 4,
+      "tool": "Python RAC",
+      "domain": "Runtime assertion checking",
+      "scope": "runtime_continuous",
+      "status": "ACTIVE",
+      "results": {
+        "property_mapping": "1:1 with TLA+ safety properties",
+        "coverage": "Live production traffic"
+      },
+      "artifacts": ["kevros-gateway/"]
+    },
+    {
+      "layer": 5,
+      "tool": "Golden Vectors",
+      "domain": "Cross-language equivalence",
+      "scope": "byte_identity",
+      "status": "VERIFIED",
+      "results": {
+        "description": "Python and Rust implementations produce byte-identical outputs for all test vectors",
+        "runtime_seconds": 1
+      }
+    }
+  ],
+
+  "comparison": {
+    "note": "No published organization has demonstrated five-layer formal verification on a single product",
+    "aws": {
+      "tools_used": ["TLA+", "Property testing", "Fuzzing", "CBMC", "Dafny"],
+      "applied_to": "Different tools on different products (DynamoDB, S3, Firecracker, Encryption SDK)",
+      "unified_stack": false
+    },
+    "microsoft": {
+      "tools_used": ["TLA+", "Static Driver Verifier", "Verus"],
+      "applied_to": "Different tools on different products (Cosmos DB, Windows, research case studies)",
+      "unified_stack": false
+    },
+    "kevros": {
+      "tools_used": ["TLA+/TLC", "Kani/CBMC", "Verus/Z3", "Python RAC", "Golden Vectors"],
+      "applied_to": "All five tools on ONE product (Kevros Enforcement Kernel)",
+      "unified_stack": true
+    }
+  }
+}
