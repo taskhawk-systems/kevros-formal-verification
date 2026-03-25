@@ -23,7 +23,7 @@ This repository contains the formal specifications, proofs, and runtime assertio
 | 5 | **Golden Vectors** | Cross-language equivalence | Byte identity — Python and Rust | Byte-identical outputs |
 | 6 | **Lean 4** | Interactive theorem proving | Unbounded deductive — machine-checked proof | 20/20 theorems, 0 sorry |
 
-No published organization — including AWS, Microsoft, or Google — has demonstrated six independent formal verification tools on a single product. AWS applies TLA+, CBMC, Dafny, and fuzzing across DynamoDB, S3, Firecracker, and the Encryption SDK respectively. Microsoft applies TLA+, Static Driver Verifier, and Verus across Cosmos DB, Windows, and research prototypes. Kevros applies all six to one kernel.
+No published organization has demonstrated six independent formal verification tools on a single product. AWS applies TLA+, CBMC, Dafny, and fuzzing across DynamoDB, S3, Firecracker, and the Encryption SDK respectively. Microsoft applies TLA+, Static Driver Verifier, and Verus across Cosmos DB, Windows, and research prototypes. Kevros applies all six to one kernel.
 
 ## Safety Properties (SP1–SP12)
 
@@ -132,4 +132,4 @@ MIT
 ## Contact
 
 John McGraw — Founder/CEO, TaskHawk Systems
-admin@taskhawktech.com
+j.mcgraw@taskhawktech.com
