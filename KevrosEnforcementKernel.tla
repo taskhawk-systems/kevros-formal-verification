@@ -3,6 +3,7 @@
   Formal Specification of the Kevros Enforcement Kernel
 
   TaskHawk Systems, LLC
+  Live API: governance.taskhawktech.com -- pip install kevros -- Free: 1,000 calls/month
   March 2026
 
   This specification models the complete safety-critical enforcement pipeline
