@@ -5,6 +5,7 @@
 
   Source: github.com/taskhawk-systems/kevros-formal-verification
   Author: John McGraw, TaskHawk Systems, LLC
+  Live API: governance.taskhawktech.com  •  pip install kevros  •  Free: 1,000 calls/month
   Date: March 2026
 
   Key design decisions:
