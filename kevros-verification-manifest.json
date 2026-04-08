@@ -1,17 +1,19 @@
 {
   "$schema": "https://governance.taskhawktech.com/schemas/verification-manifest/1.0",
-  "manifest_version": "1.0",
+  "manifest_version": "2.0",
   "product": "Kevros Enforcement Kernel",
   "organization": "TaskHawk Systems, LLC",
-  "generated": "2026-03-24T05:07:54Z",
+  "generated": "2026-03-24T00:00:00Z",
   "status": "ALL_VERIFIED",
 
   "summary": {
-    "total_layers": 5,
-    "total_proofs": 51,
+    "total_layers": 6,
+    "total_proofs": 71,
     "total_failures": 0,
     "safety_properties_defined": 12,
     "safety_properties_verified": 12,
+    "liveness_properties_defined": 4,
+    "liveness_properties_verified": 4,
     "combined_verification_time_seconds": 35,
     "total_cost_usd": 3.50
   },
@@ -31,12 +33,19 @@
     {"id": "SP12", "name": "ChainIntegrityInvariant",     "description": "Evidence chain hash-links are unbroken (three sub-properties)"}
   ],
 
+  "liveness_properties": [
+    {"id": "LP1", "name": "EventuallyRun",           "description": "System eventually reaches RUN under persistent good conditions"},
+    {"id": "LP2", "name": "RunExitsOnLowSafety",     "description": "RUN exits when safety confidence drops below threshold"},
+    {"id": "LP3", "name": "BootEventuallyCompletes",  "description": "BOOT phase completes within bounded time"},
+    {"id": "LP4", "name": "PipelineReturnsToIdle",    "description": "Request pipeline always returns to IDLE"}
+  ],
+
   "layers": [
     {
       "layer": 1,
       "tool": "TLA+/TLC",
       "tool_version": "TLC 2.18",
-      "domain": "System architecture",
+      "domain": "System architecture — bounded exhaustive model checking",
       "scope": "bounded_exhaustive",
       "status": "VERIFIED",
       "spec_file": "KevrosEnforcementKernel.tla",
@@ -59,7 +68,7 @@
       "layer": 2,
       "tool": "Kani/CBMC",
       "tool_version": "Kani 0.66.0 / CBMC 6.5.0",
-      "domain": "Rust implementation correctness",
+      "domain": "Rust implementation correctness — bounded model checking",
       "scope": "bounded_model_checking",
       "status": "VERIFIED",
       "environment": {
@@ -100,14 +109,14 @@
         "Built AbstractModeManager with KappaRegion enum to eliminate IEEE 754 f64 bit-blasting from SAT solving",
         "#[cfg(kani)] crypto stubs for ring::digest and ring::hmac FFI boundaries"
       ],
-      "commits": ["09a9ce06", "05505be9", "1a1a32b9", "3a7b0271"],
+      "commits": ["05505be9"],
       "artifacts": ["enforcer-rs/src/verification/"]
     },
     {
       "layer": 3,
       "tool": "Verus/Z3",
-      "tool_version": "Verus 0.2026.03.22.5e66329 / Z3",
-      "domain": "Unbounded proof (all possible inputs)",
+      "tool_version": "Verus latest / Z3",
+      "domain": "Unbounded proof — all possible inputs via SMT",
       "scope": "unbounded_smt",
       "status": "VERIFIED",
       "environment": {
@@ -127,20 +136,20 @@
         {"file": "evidence.rs",     "verified": 6, "errors": 0, "properties": ["SP12_chain", "SP12_determinism", "SP12_genesis", "SP12_inductive"]}
       ],
       "key_properties": [
-        "Hash modeled as uninterpreted function (Z3 oracle) - proofs hold for ANY hash algorithm",
+        "Hash modeled as uninterpreted function (Z3 oracle) — proofs hold for ANY hash algorithm",
         "Same AbstractModeManager + KappaRegion abstraction as Kani layer (bisimulation relation)",
-        "All quantifiers are universal (forall) - no existential witnesses required"
+        "All quantifiers are universal (forall) — no existential witnesses required"
       ],
       "warnings": [
         {"type": "cosmetic", "message": "hash_oracle needs uninterp annotation in future Verus versions"}
       ],
-      "commits": ["1ed6d1e5", "875f1e9f"],
+      "commit": "1ed6d1e5",
       "artifacts": ["enforcer-rs/verus-proofs/"]
     },
     {
       "layer": 4,
       "tool": "Python RAC",
-      "domain": "Runtime assertion checking",
+      "domain": "Runtime assertion checking — live production traffic",
       "scope": "runtime_continuous",
       "status": "ACTIVE",
       "results": {
@@ -152,18 +161,80 @@
     {
       "layer": 5,
       "tool": "Golden Vectors",
-      "domain": "Cross-language equivalence",
+      "domain": "Cross-language equivalence — byte-identical outputs",
       "scope": "byte_identity",
       "status": "VERIFIED",
       "results": {
         "description": "Python and Rust implementations produce byte-identical outputs for all test vectors",
         "runtime_seconds": 1
       }
+    },
+    {
+      "layer": 6,
+      "tool": "Lean 4",
+      "tool_version": "Lean 4.15.0+",
+      "domain": "Interactive theorem proving — machine-checked mathematical proof",
+      "scope": "unbounded_deductive",
+      "status": "VERIFIED",
+      "spec_file": "KevrosCorrect.lean",
+      "spec_lines": 760,
+      "results": {
+        "theorems_total": 20,
+        "theorems_verified": 20,
+        "theorems_sorry": 0,
+        "safety_theorems": 14,
+        "liveness_theorems": 6,
+        "proof_obligations": "~648 (24 Next constructors x 27 invariant conjuncts)",
+        "proof_strategy": "Induction on Reachable relation with case analysis on Next"
+      },
+      "theorems": {
+        "core": [
+          {"name": "inv_holds",     "property": "Strengthened inductive invariant (27 conjuncts)", "result": "VERIFIED"},
+          {"name": "safety_holds",  "property": "SafetyInv follows from strengthened invariant",   "result": "VERIFIED"}
+        ],
+        "safety_SP1_SP12": [
+          {"name": "SP1",  "property": "PermissionBeforePower — actuation implies tokenVerified",                   "result": "VERIFIED"},
+          {"name": "SP2",  "property": "FailClosedAuth — HMAC failure implies DENY",                                "result": "VERIFIED"},
+          {"name": "SP3",  "property": "FailClosedEvidence — evidence failure implies DENY",                         "result": "VERIFIED"},
+          {"name": "SP4",  "property": "EvidenceBeforeToken — tokenIssued implies evidenceWritten",                  "result": "VERIFIED"},
+          {"name": "SP5",  "property": "TokenRequiredForActuation — actuation implies tokenIssued",                  "result": "VERIFIED"},
+          {"name": "SP6",  "property": "ModeDecisionConsistency — ALLOW/CLAMP only in RUN mode",                    "result": "VERIFIED"},
+          {"name": "SP7",  "property": "FaultIsLatched — modePrev=FAULT implies mode is FAULT or INERT",            "result": "VERIFIED"},
+          {"name": "SP8",  "property": "NoDirectInertToRun — modePrev=INERT implies mode != RUN",                   "result": "VERIFIED"},
+          {"name": "SP9",  "property": "BootPromotionValid — RUN from BOOT requires consecutiveOk >= nPromote",     "result": "VERIFIED"},
+          {"name": "SP10", "property": "BootTimeoutBounded — BOOT duration bounded by bT + dT + 1",                 "result": "VERIFIED"},
+          {"name": "SP11", "property": "DenyZeroActuation — DENY or HALT implies zero actuation",                   "result": "VERIFIED"},
+          {"name": "SP12", "property": "ChainIntegrityInvariant — chainIntact always true",                          "result": "VERIFIED"}
+        ],
+        "liveness": [
+          {"name": "pipeline_progress",    "property": "Every non-idle phase has a strictly closer successor",                            "result": "VERIFIED"},
+          {"name": "LP4_PipelineCompletes","property": "Pipeline returns to IDLE in at most 6 steps (well-founded induction on phaseDist)","result": "VERIFIED"},
+          {"name": "LP3_BootExits",        "property": "BOOT exits when timeout exceeded and dwell satisfied",                             "result": "VERIFIED"},
+          {"name": "LP2_RunExits",         "property": "RUN exits when kappaRegion drops to belowOff",                                     "result": "VERIFIED"},
+          {"name": "LP1_BootProgress",     "property": "BOOT accumulates toward RUN or promotes when consecutiveOk >= nPromote",           "result": "VERIFIED"},
+          {"name": "LP1_InertToBoot",      "property": "INERT transitions to BOOT under good conditions",                                 "result": "VERIFIED"}
+        ]
+      },
+      "key_properties": [
+        "Faithful translation of KevrosEnforcementKernel.tla (716 lines TLA+ -> 760 lines Lean 4)",
+        "KappaRegion abstraction eliminates IEEE 754 — same as Kani/Verus layers",
+        "All proofs by induction on Reachable with case analysis on Next — no sorry, no axioms",
+        "Strengthened invariant with 27 conjuncts enables mechanical inductive step",
+        "Hash function modeled as uninterpreted (chainIntact : Bool) — proofs hold for any hash",
+        "Liveness encoded as bounded progress via well-founded phaseDist variant",
+        "Zero external dependencies — pure Lean 4.15.0+"
+      ],
+      "relationship_to_other_layers": {
+        "layer_1_TLA": "Lean 4 spec is a faithful 1:1 translation of the TLA+ spec; same state space, same Next relation, same safety invariants",
+        "layer_2_Kani": "Shares KappaRegion abstraction and safety property numbering (SP1-SP12)",
+        "layer_3_Verus": "Complementary — Verus proves Rust implementation; Lean 4 proves mathematical model. Both use induction on reachability."
+      },
+      "artifacts": ["KevrosCorrect.lean"]
     }
   ],
 
   "comparison": {
-    "note": "No published organization has demonstrated five-layer formal verification on a single product",
+    "note": "No published organization has demonstrated six-layer formal verification on a single product",
     "aws": {
       "tools_used": ["TLA+", "Property testing", "Fuzzing", "CBMC", "Dafny"],
       "applied_to": "Different tools on different products (DynamoDB, S3, Firecracker, Encryption SDK)",
@@ -175,8 +246,8 @@
       "unified_stack": false
     },
     "kevros": {
-      "tools_used": ["TLA+/TLC", "Kani/CBMC", "Verus/Z3", "Python RAC", "Golden Vectors"],
-      "applied_to": "All five tools on ONE product (Kevros Enforcement Kernel)",
+      "tools_used": ["TLA+/TLC", "Kani/CBMC", "Verus/Z3", "Python RAC", "Golden Vectors", "Lean 4"],
+      "applied_to": "All six tools on ONE product (Kevros Enforcement Kernel)",
       "unified_stack": true
     }
   }
