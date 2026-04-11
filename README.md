@@ -134,23 +134,7 @@ MIT
 John McGraw — Founder/CEO, TaskHawk Systems
 j.mcgraw@taskhawktech.com
 
-## Try It
 
-The enforcement kernel proven here powers the [Kevros Runtime Intelligence Gateway](https://governance.taskhawktech.com) — a live API that verifies AI agent actions, records hash-chained provenance, and issues cryptographic release tokens.
-
-```bash
-pip install kevros
-```
-
-```python
-from kevros import KevrosClient
-
-client = KevrosClient()  # auto-provisions free API key (1,000 calls/month)
-result = client.verify(action_type="deploy", action_payload={"target": "prod"}, agent_id="my-agent")
-print(result)  # {'decision': 'ALLOW', 'release_token': '...'}
 ```
 
 - **Website:** [taskhawktech.com](https://www.taskhawktech.com)
-- **MCP Server:** `https://governance.taskhawktech.com/mcp/`
-- **API Docs:** [governance.taskhawktech.com/openapi.json](https://governance.taskhawktech.com/openapi.json)
-- **Contact:** info@taskhawktech.com
