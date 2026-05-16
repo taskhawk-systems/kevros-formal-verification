@@ -680,7 +680,7 @@ termination_by phaseDist s.phase
 /-- LP3 (structural): From any reachable state in BOOT with phase=idle
     and tick - bootStart > bootTimeout, there exists a single step exiting BOOT. -/
 theorem LP3_BootExits (nP bT dT : Nat) (s : State)
-    (hR : Reachable nP bT dT s) (hB : s.mode = .boot)
+    (_hR : Reachable nP bT dT s) (hB : s.mode = .boot)
     (hI : s.phase = .idle) (hTO : s.tick - s.bootStart > bT)
     (hDw : canTransition dT s) :
     ∃ s', Next nP bT dT s s' ∧ s'.mode ≠ .boot := by
@@ -699,7 +699,7 @@ theorem LP3_BootExits (nP bT dT : Nat) (s : State)
 /-- LP2 (structural): From any RUN state with low kappa, idle phase,
     and dwell satisfied, there exists a single step exiting RUN. -/
 theorem LP2_RunExits (nP bT dT : Nat) (s : State)
-    (hR : Reachable nP bT dT s) (hM : s.mode = .run)
+    (_hR : Reachable nP bT dT s) (hM : s.mode = .run)
     (hK : s.kappaRegion = .belowOff) (hI : s.phase = .idle)
     (hDw : canTransition dT s) :
     ∃ s', Next nP bT dT s s' ∧ s'.mode ≠ .run := by
@@ -724,7 +724,7 @@ theorem LP2_RunExits (nP bT dT : Nat) (s : State)
     there exists a step that either promotes to RUN or accumulates
     toward promotion. -/
 theorem LP1_BootProgress (nP bT dT : Nat) (s : State)
-    (hR : Reachable nP bT dT s) (hM : s.mode = .boot)
+    (_hR : Reachable nP bT dT s) (hM : s.mode = .boot)
     (hK : s.kappaRegion = .aboveOn) (hI : s.phase = .idle)
     (hTO : s.tick - s.bootStart ≤ bT)
     (hDw : canTransition dT s) :
