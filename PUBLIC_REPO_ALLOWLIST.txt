@@ -1,0 +1,14 @@
+# Public assurance capsule allowlist.
+# Every tracked file at current HEAD must appear below.
+
+.gitignore
+AxiomAudit.lean
+KevrosCorrect.lean
+LICENSE
+NOTICE.md
+PUBLIC_REPO_ALLOWLIST.txt
+README.md
+kevros-verification-manifest.json
+lakefile.lean
+lean-toolchain
+verify_public_assurance.py

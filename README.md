@@ -1,155 +1,127 @@
-# Kevros Enforcement Kernel
+# Kevros Enforcement Kernel Public Assurance Capsule
 
-**Six-Layer Formal Verification of a Safety-Critical AI Governance Kernel**
+TaskHawk Systems, LLC
 
-TaskHawk Systems, LLC | March 2026
+## Purpose
 
----
+This repository contains a sanitized, abstract Lean 4 model of selected
+authorization and fail-closed safety properties associated with the Kevros
+Enforcement Kernel. It is provided so that reviewers can inspect the theorem
+statements and run the proof checker without access to TaskHawk production
+software.
 
-## Overview
+This repository is not the Kevros product source repository.
 
-The Kevros Enforcement Kernel is a formally verified, deterministic enforcement boundary for autonomous AI agents. It enforces 12 safety invariants and 4 liveness properties through a deterministic pipeline: every agent action must pass authentication, mode checking, decision computation, evidence logging, and token gating before actuation occurs. A DENY verdict produces zero actuation. Always.
+## Published Result
 
-This repository contains the formal specifications, proofs, and runtime assertions that constitute the comprehensive formal verification stack applied to the kernel: **six independent verification layers, 71 total proofs, zero failures.**
+The public proof source currently contains:
 
-## Six-Layer Verification Stack
+- 20 theorem declarations;
+- 12 named safety-property theorems;
+- 6 structural-progress theorems;
+- zero `sorry` declarations;
+- zero `admit` declarations;
+- zero project-defined `axiom` declarations; and
+- zero `unsafe` declarations.
 
-| Layer | Tool | Domain | Scope | Result |
-|-------|------|--------|-------|--------|
-| 1 | **TLA+ / TLC 2.18** | System architecture | Bounded exhaustive (1.94B states, 171M distinct) | 12/12 invariants, 4/4 liveness |
-| 2 | **Kani 0.66.0 / CBMC 6.5.0** | Rust implementation | Bounded model checking (72 vCPU, 145 GB) | 17/17 harnesses, 99 unit tests |
-| 3 | **Verus / Z3** | Unbounded proof | SMT, all possible inputs | 22/22 proofs across 899 lines |
-| 4 | **Python RAC** | Runtime assertions | Continuous, live production traffic | 1:1 property mapping with TLA+ |
-| 5 | **Golden Vectors** | Cross-language equivalence | Byte identity, Python and Rust | Byte-identical outputs |
-| 6 | **Lean 4** | Interactive theorem proving | Unbounded deductive, machine-checked proof | 20/20 theorems, 0 sorry |
+The proof builds with the pinned Lean 4.15.0 toolchain.
 
-Among published verification programs we are aware of, no other organization has applied six independent formal verification tools to a single product. AWS applies TLA+, CBMC, Dafny, and fuzzing across DynamoDB, S3, Firecracker, and the Encryption SDK respectively. Microsoft applies TLA+, Static Driver Verifier, and Verus across Cosmos DB, Windows, and research prototypes. Kevros applies all six to one kernel.
+## Proof Inventory
 
-## Safety Properties (SP1 through SP12)
+| Category | Count | Scope |
+| --- | ---: | --- |
+| Core induction | 2 | Reachability and strengthened safety invariant |
+| Safety properties | 12 | Properties SP1 through SP12 for modeled reachable states |
+| Structural progress | 6 | Existential or bounded progress under stated premises |
+| Total | 20 | Public theorem declarations in `KevrosCorrect.lean` |
 
-| ID | Name | Invariant |
-|----|------|-----------|
-| SP1 | PermissionBeforePower | No actuation without valid release token |
-| SP2 | FailClosedAuth | Any authentication error produces DENY |
-| SP3 | FailClosedEvidence | Any evidence-write error produces DENY |
-| SP4 | EvidenceBeforeToken | Token issued only after evidence appended |
-| SP5 | TokenRequiredForActuation | Actuation gate rejects without valid token |
-| SP6 | ModeDecisionConsistency | ALLOW/CLAMP decisions only in RUN mode |
-| SP7 | FaultIsLatched | Once in FAULT, only resets to INERT |
-| SP8 | NoDirectInertToRun | No single transition from INERT to RUN |
-| SP9 | BootPromotionValid | BOOT to RUN requires nPromote consecutive OK readings |
-| SP10 | BootTimeoutBounded | BOOT phase bounded by bootTimeout + dwellTicks + 1 |
-| SP11 | DenyZeroActuation | DENY or HALT verdict produces zero actuation |
-| SP12 | ChainIntegrityInvariant | Evidence chain hash-links are unbroken |
+## Reproduction
 
-## Liveness Properties (LP1 through LP4)
-
-| ID | Name | Property |
-|----|------|----------|
-| LP1 | EventuallyRun | System reaches RUN under persistent good conditions |
-| LP2 | RunExitsOnLowSafety | RUN exits when safety confidence drops below threshold |
-| LP3 | BootEventuallyCompletes | BOOT completes within bounded time |
-| LP4 | PipelineReturnsToIdle | Request pipeline returns to IDLE in at most 6 steps |
-
-## Layer 6: Lean 4 Formalization
-
-The Lean 4 formalization (`KevrosCorrect.lean`, 760 lines) is a faithful translation of the TLA+ specification. It provides machine-checked mathematical proof that all 12 safety invariants hold for every reachable state and all 4 liveness properties are structurally guaranteed.
-
-**20 theorems, 0 sorry.**
-
-The proof proceeds by induction on the `Reachable` relation with case analysis on all 24 constructors of the `Next` transition relation. A strengthened invariant with 27 conjuncts enables the inductive step to close mechanically. Key design decisions:
-
-- **KappaRegion abstraction** eliminates IEEE 754 floating-point from the model, consistent with Layers 2 and 3.
-- **Hash as uninterpreted function:** chain integrity proofs hold for any hash algorithm satisfying the abstract specification.
-- **Well-founded variant (phaseDist):** LP4 uses well-founded induction on pipeline phase distance, proving completion in at most 6 steps.
-- **Zero dependencies:** pure Lean 4.15.0+, no Mathlib, no axioms beyond the Lean kernel.
-
-### Theorem Catalog
-
-**Core:**
-- `inv_holds`: strengthened inductive invariant (27 conjuncts) holds for all reachable states
-- `safety_holds`: SafetyInv is a direct consequence of the strengthened invariant
-
-**Safety (SP1 through SP12):**
-- `SP1` through `SP12`: each safety property extracted as an individual theorem
-
-**Liveness (LP1 through LP4):**
-- `pipeline_progress`: every non-idle phase has a strictly closer successor
-- `LP4_PipelineCompletes`: pipeline returns to IDLE (well-founded induction on phaseDist)
-- `LP3_BootExits`: BOOT exits when timeout exceeded
-- `LP2_RunExits`: RUN exits when kappaRegion drops to belowOff
-- `LP1_BootProgress`: BOOT accumulates toward RUN or promotes
-- `LP1_InertToBoot`: INERT transitions to BOOT under good conditions
-
-## Assumptions and Non-Claims
-
-The verification stack proves specific properties under specific assumptions. The boundaries are documented explicitly so reviewers know what is proved and what is taken as given.
-
-**Stated assumptions.**
-
-- *Hash function* (Layers 1 and 6): treated as an uninterpreted function. Proofs of chain integrity hold for any concrete hash algorithm that satisfies the abstract specification.
-- *KappaRegion abstraction* (Layers 2, 3, and 6): replaces IEEE 754 floating-point with a finite three-region partition (aboveOn, belowOff, between). Proofs hold for any concrete implementation that respects the partition boundaries.
-- *Mode state space* (all layers): the four mode values (INERT, BOOT, RUN, FAULT) constitute the complete and disjoint state space. No other operating modes exist.
-- *Next-relation constructors* (Layer 6): the 24 transition constructors enumerate every legitimate state change. No transition occurs outside this enumeration.
-
-**Out of scope of this corpus.**
-
-- *Cryptographic primitive security.* HMAC, FIPS 204 ML-DSA-87, and FIPS 205 SLH-DSA-SHA2-256f are taken as secure per their published specifications. The corpus does not re-prove the security of these primitives.
-- *Deployed binary correspondence.* The correspondence between the Lean 4 mathematical model and the deployed binary is established at Layer 5 (Golden Vectors) by byte-identical output equivalence across language implementations. This corpus does not perform extraction-based compilation verification.
-- *Deployment infrastructure.* Container runtime, network transport, persistence layer, and key management are verified at Layers 2 through 5 against their respective specifications. Layer 6 verifies the mathematical model.
-- *AI model behavior.* The AI agent that produces actions is intentionally outside the verification boundary. The kernel treats agent output as untrusted input and applies the proved enforcement rules to every action regardless of its origin.
-
-## Repository Structure
-
-```
-kevros-formal-verification/
-├── KevrosEnforcementKernel.tla       Layer 1: TLA+ specification (716 lines)
-├── KevrosEnforcementKernel.cfg       TLC configuration (12 invariants, bounded constants)
-├── ModeManager.tla                   Standalone mode manager specification
-├── ModeManager.cfg                   TLC configuration for ModeManager
-├── KevrosCorrect.lean                Layer 6: Lean 4 formalization (760 lines)
-├── lakefile.lean                     Lean 4 build configuration
-├── lean-toolchain                    Lean 4 version pin (v4.15.0)
-├── tlc-output.txt                    Complete TLC output (March 24, 2026)
-├── kevros-verification-manifest.json Machine-readable verification results
-├── timestamps/                       RFC 3161 timestamps (FreeTSA)
-├── Six-Layer-Formal-Verification-AI-Governance-Kernel.pdf
-└── README.md
-```
-
-## Reproducing the Verification
+Install the pinned Lean toolchain, then run:
 
 ```bash
-# Layer 1: TLA+ model checking (requires Java 11+)
-wget https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
-java -XX:+UseParallelGC -Xmx8G -cp tla2tools.jar tlc2.TLC \
-  -workers auto \
-  -config KevrosEnforcementKernel.cfg \
-  KevrosEnforcementKernel.tla
+python3 verify_public_assurance.py
+```
 
-# Layer 6: Lean 4 theorem proving (requires elan)
-curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh
+The verifier performs the following checks:
+
+1. confirms the pinned Lean version;
+2. builds the proof with `lake build`;
+3. confirms the expected theorem count;
+4. rejects `sorry`, `admit`, project-defined `axiom`, and `unsafe`
+   declarations in executable Lean source;
+5. checks the theorem dependency report against the documented allowance for
+   standard Lean logical foundations; and
+6. verifies the public file allowlist and manifest digest.
+
+The direct build command is:
+
+```bash
 lake build
 ```
 
-## Numbers
+## Interpretation Boundary
 
-- **1,943,069,194** states generated by TLC
-- **171,647,834** distinct states explored
-- **118** search depth
-- **71** total proofs across 6 layers
-- **20** Lean 4 theorems with **0 sorry**
-- **~648** proof obligations (24 constructors × 27 conjuncts)
-- **12** safety invariants, **4** liveness properties
-- **0** violations
+The Lean checker establishes that the published theorem terms type-check for
+the abstract model in `KevrosCorrect.lean`. The result is limited to the
+definitions, transition relation, premises, and theorem statements in that
+file.
 
-## License
+In particular:
 
-MIT
+- `KappaRegion` is a finite abstraction of threshold regions. The proof does
+  not reason over concrete floating-point execution.
+- SP12 preserves an abstract `chainIntact` state predicate. It does not prove
+  the security of a concrete hash function or verify a deployed evidence
+  store.
+- The structural-progress theorems establish the existence of progress paths
+  under stated premises. They do not establish universal fair-trace liveness.
+- The proof does not establish correspondence between this model and any
+  compiled or deployed binary.
 
-## Contact
+## Material Not Included
 
-John McGraw, Founder and CEO, TaskHawk Systems
-j.mcgraw@taskhawktech.com
+This repository does not contain or license:
 
-**Website:** [taskhawktech.com](https://www.taskhawktech.com)
+- production source code;
+- cryptographic keys, preimages, or protocol implementation details;
+- deployment configuration or operational data;
+- private verification harnesses;
+- private test vectors;
+- customer or partner information; or
+- confidential implementation-correspondence evidence.
+
+Those exclusions are intentional. Statements about private verification work
+are outside the scope of this public repository.
+
+## Non-Claims
+
+Publication of this capsule is not:
+
+- a product certification;
+- a safety approval;
+- an independent third-party assessment;
+- a statement that every production behavior has been formally verified;
+- a claim of deployed-binary equivalence;
+- a claim about cryptographic primitive security;
+- a claim of uniqueness or priority; or
+- an endorsement by any external organization.
+
+## Repository Contents
+
+```text
+KevrosCorrect.lean                 Public abstract model and proofs
+AxiomAudit.lean                    Theorem dependency report
+lakefile.lean                      Lean build definition
+lean-toolchain                     Pinned Lean version
+kevros-verification-manifest.json  Public capsule manifest
+verify_public_assurance.py         Deterministic public verifier
+PUBLIC_REPO_ALLOWLIST.txt          Permitted public files
+NOTICE.md                          License and scope notice
+LICENSE                            License for included material
+```
+
+## License and Scope
+
+The repository license applies only to material included in this repository.
+See [NOTICE.md](NOTICE.md) for the scope boundary.
