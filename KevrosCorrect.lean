@@ -1,27 +1,23 @@
 /-
-  Kevros Enforcement Kernel — Lean 4 Formalization
-  Faithful translation of KevrosEnforcementKernel.tla (716 lines)
-  TLC result: 1.94 billion states, 12 safety invariants, 4 liveness properties, 0 violations
+  Kevros Enforcement Kernel - Public Lean 4 Assurance Abstraction
 
-  Source: github.com/taskhawk-systems/kevros-formal-verification
-  Author: John McGraw, TaskHawk Systems, LLC
-  Live API: governance.taskhawktech.com  •  pip install kevros  •  Free: 1,000 calls/month
-  Date: March 2026
+  This file contains an abstract state-transition model and machine-checked
+  theorem proofs. It is not production source code and does not establish
+  deployed-binary correspondence, cryptographic primitive security, or
+  deployment correctness.
 
-  Key design decisions:
-    • KappaRegion abstraction eliminates IEEE 754 from the model.
-    • All mode transitions require phase = IDLE (TLA+ line 201).
-    • BootAccumulate has tick - boot_start <= BOOT_TIMEOUT guard (TLA+ line 283).
-    • RunSafetyExit goes to INERT (TLA+ line 244).
-    • AuthenticateRequest skips to EVIDENCE on auth fail (TLA+ line 363).
-    • CheckMode skips to EVIDENCE on mode fail (TLA+ line 376).
-    • ReceiveRequest defaults to DENY (TLA+ line 348, fail-closed).
-    • Hash function is uninterpreted (chain integrity is boolean).
-    • All proofs by induction on Reachable with case analysis on Next.
+  Proof scope:
+    - KappaRegion is a finite abstraction of threshold regions.
+    - Mode transitions require an idle pipeline phase.
+    - Failure paths remain fail-closed within the modeled transition system.
+    - Chain integrity is represented by an abstract Boolean state predicate.
+    - Safety proofs use induction on Reachable and case analysis on Next.
+    - Progress theorems are existential structural results, not universal
+      fair-trace liveness claims.
+
+  Toolchain: Lean 4.15.0.
+  Verification command: `lake build`.
 -/
-
--- No external dependencies. Lean 4.15.0+.
--- To verify: `lake build`
 
 namespace Kevros
 
@@ -57,7 +53,7 @@ structure State where
   chainIntact : Bool
   deriving Repr, BEq
 
-/-! ## Initial State (TLA+ Init, line 172) -/
+/-! ## Initial State -/
 
 def IsInit (s : State) : Prop :=
   s.mode = .inert ∧ s.modePrev = .inert ∧ s.phase = .idle ∧
@@ -71,13 +67,13 @@ def IsInit (s : State) : Prop :=
 def canTransition (dwellTicks : Nat) (s : State) : Prop :=
   s.tick - s.lastTransition ≥ dwellTicks
 
-/-! ## Next-State Relation (TLA+ Next, line 495)
+/-! ## Next-State Relation
 
-    ALL mode transitions require phase = IDLE (TLA+ line 201).
+    All mode transitions require phase = IDLE.
     Every constructor fully constrains all fields of s'. -/
 
 inductive Next (nP bT dT : Nat) : State → State → Prop
-  -- INERT → BOOT (TLA+ InertToBoot, line 264)
+  -- INERT -> BOOT
   | inertToBoot (s s' : State)
       (hI : s.phase = .idle) (hM : s.mode = .inert)
       (hK : s.kappaRegion = .aboveOn) (hO : s.timeOracleOk = true)
@@ -90,7 +86,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- BOOT accumulate (TLA+ BootAccumulate, line 280, ELSE branch)
+  -- BOOT accumulation
   | bootAccumulate (s s' : State)
       (hI : s.phase = .idle) (hM : s.mode = .boot) (hK : s.kappaRegion = .aboveOn)
       (hTO : s.tick - s.bootStart ≤ bT) (hNP : s.consecutiveOk + 1 < nP)
@@ -102,7 +98,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- BOOT → RUN (TLA+ BootAccumulate, line 280, THEN branch)
+  -- BOOT -> RUN
   | bootToRun (s s' : State)
       (hI : s.phase = .idle) (hM : s.mode = .boot) (hK : s.kappaRegion = .aboveOn)
       (hTO : s.tick - s.bootStart ≤ bT) (hProm : s.consecutiveOk + 1 ≥ nP)
@@ -115,19 +111,19 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- BOOT confidence drop (TLA+ BootConfidenceDrop, line 295)
+  -- BOOT confidence drop
   | bootConfDrop (s s' : State)
       (hI : s.phase = .idle) (hM : s.mode = .boot) (hK : s.kappaRegion ≠ .aboveOn)
       (h1 : s'.mode = s.mode) (h2 : s'.modePrev = s.modePrev) (h3 : s'.consecutiveOk = 0)
       (h4 : s'.bootStart = s.bootStart) (h5 : s'.lastTransition = s.lastTransition)
-      (h6 : s'.tick = s.tick)  -- TLA+ line 301: UNCHANGED <<tick, ...>>
+      (h6 : s'.tick = s.tick)
       (h7 : s'.phase = s.phase) (h8 : s'.decision = s.decision) (h9 : s'.actuation = s.actuation)
       (h10 : s'.tokenVerified = s.tokenVerified) (h11 : s'.tokenIssued = s.tokenIssued)
       (h12 : s'.evidenceWritten = s.evidenceWritten) (h13 : s'.writeSucceeded = s.writeSucceeded)
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- RUN → INERT (TLA+ RunSafetyExit, line 239)
+  -- RUN -> INERT
   | runExit (s s' : State)
       (hI : s.phase = .idle) (hM : s.mode = .run) (hK : s.kappaRegion = .belowOff)
       (hDw : canTransition dT s)
@@ -139,7 +135,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Any → FAULT (TLA+ IntegrityFault, line 227)
+  -- Any mode -> FAULT
   | toFault (s s' : State)
       (hI : s.phase = .idle) (hBad : s.timeOracleOk = false ∨ s.integrityOk = false)
       (hNF : s.mode ≠ .fault)
@@ -151,7 +147,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- FAULT → INERT (TLA+ ManualReset, line 314)
+  -- FAULT -> INERT
   | faultReset (s s' : State)
       (hI : s.phase = .idle) (hM : s.mode = .fault)
       (h1 : s'.mode = .inert) (h2 : s'.modePrev = .fault) (h3 : s'.consecutiveOk = 0)
@@ -162,7 +158,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- BOOT timeout (TLA+ BootTimeout, line 251)
+  -- BOOT timeout
   | bootTimeout (s s' : State)
       (hI : s.phase = .idle) (hM : s.mode = .boot) (hTO : s.tick - s.bootStart > bT)
       (hDw : canTransition dT s)
@@ -174,7 +170,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Receive request (TLA+ ReceiveRequest, line 344)
+  -- Receive request
   | receive (s s' : State)
       (hP : s.phase = .idle)
       (h1 : s'.phase = .auth) (h2 : s'.decision = .deny) (h3 : s'.actuation = .zero)
@@ -185,7 +181,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h13 : s'.chainLength = s.chainLength) (h14 : s'.chainIntact = s.chainIntact)
       (h15 : s'.writeSucceeded = s.writeSucceeded)
       : Next nP bT dT s s'
-  -- Auth pass (TLA+ AuthenticateRequest THEN, line 361)
+  -- Authentication pass
   | authPass (s s' : State)
       (hP : s.phase = .auth) (hA : s.requestHmacOk = true)
       (h1 : s'.phase = .modeCheck) (h2 : s'.decision = s.decision) (h3 : s'.actuation = s.actuation)
@@ -196,7 +192,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Auth fail → EVIDENCE (TLA+ AuthenticateRequest ELSE, line 363)
+  -- Authentication failure -> EVIDENCE
   | authFail (s s' : State)
       (hP : s.phase = .auth) (hA : s.requestHmacOk = false)
       (h1 : s'.phase = .evidence) (h2 : s'.decision = .deny) (h3 : s'.actuation = s.actuation)
@@ -207,7 +203,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Mode check pass (TLA+ CheckMode THEN, line 374)
+  -- Mode check pass
   | modePass (s s' : State)
       (hP : s.phase = .modeCheck) (hR : s.mode = .run)
       (h1 : s'.phase = .decide) (h2 : s'.decision = s.decision) (h3 : s'.actuation = s.actuation)
@@ -218,7 +214,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Mode check fail → EVIDENCE (TLA+ CheckMode ELSE, line 376)
+  -- Mode check failure -> EVIDENCE
   | modeFail (s s' : State)
       (hP : s.phase = .modeCheck) (hNR : s.mode ≠ .run)
       (h1 : s'.phase = .evidence) (h2 : s'.decision = .deny) (h3 : s'.actuation = s.actuation)
@@ -229,7 +225,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Decide ALLOW (TLA+ ComputeDecision, line 393)
+  -- Decide ALLOW
   | decAllow (s s' : State)
       (hP : s.phase = .decide)
       (h1 : s'.phase = .evidence) (h2 : s'.decision = .allow) (h3 : s'.actuation = s.actuation)
@@ -262,7 +258,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Write evidence OK (TLA+ WriteEvidence, line 410, success)
+  -- Evidence write succeeds
   | evidOk (s s' : State)
       (hP : s.phase = .evidence)
       (h1 : s'.phase = .token) (h2 : s'.evidenceWritten = true) (h3 : s'.writeSucceeded = true)
@@ -273,7 +269,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength + 1) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Write evidence FAIL (TLA+ WriteEvidence, line 410, failure)
+  -- Evidence write fails
   | evidFail (s s' : State)
       (hP : s.phase = .evidence)
       (h1 : s'.phase = .token) (h2 : s'.evidenceWritten = false) (h3 : s'.writeSucceeded = false)
@@ -284,7 +280,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Issue token (TLA+ IssueToken, line 435, issued=true)
+  -- Issue token
   | tokIssue (s s' : State)
       (hP : s.phase = .token) (hAC : s.decision = .allow ∨ s.decision = .clamp)
       (hEv : s.evidenceWritten = true)
@@ -296,7 +292,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Deny token (TLA+ IssueToken, line 435, issued=false)
+  -- Withhold token
   | tokDeny (s s' : State)
       (hP : s.phase = .token) (hD : s.decision = .deny ∨ s.decision = .halt ∨ s.evidenceWritten = false)
       (h1 : s'.phase = .respond) (h2 : s'.tokenIssued = false) (h3 : s'.decision = s.decision)
@@ -307,7 +303,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Respond APPLY (TLA+ Respond, line 454, token verified)
+  -- Respond with applied actuation after token verification
   | rspApply (s s' : State)
       (hP : s.phase = .respond) (hT : s.tokenIssued = true)
       (h1 : s'.phase = .idle) (h2 : s'.tokenVerified = true) (h3 : s'.actuation = .applied)
@@ -340,8 +336,7 @@ inductive Next (nP bT dT : Nat) : State → State → Prop
       (h14 : s'.chainLength = s.chainLength) (h15 : s'.chainIntact = s.chainIntact)
       (h16 : s'.requestHmacOk = s.requestHmacOk)
       : Next nP bT dT s s'
-  -- Environment tick (TLA+ TickAdvance, line 481)
-  -- Guard: NoPendingModeTransition (TLA+ line 476-479)
+  -- Environment tick with no pending mode transition
   -- In particular: ¬(mode = BOOT ∧ tick - boot_start > BOOT_TIMEOUT ∧ CanTransition)
   | envTick (s s' : State)
       (hI : s.phase = .idle)
@@ -414,12 +409,8 @@ def Inv (s : State) (nP bT dT : Nat) : Prop := SafetyInv s nP bT dT ∧
 -- Proof strategy: induction on Reachable, case analysis on Next.
 -- Base case: IsInit satisfies all conjuncts (all fields fully constrained).
 -- Inductive case: for each Next constructor, rewrite s' fields and appeal to IH.
--- Key insight: ALL mode transitions require phase=IDLE (TLA+ line 201),
+-- All mode transitions require phase=IDLE,
 -- so SP6 (mode-decision consistency) is preserved through pipeline phases.
---
--- Status: proof structure verified, 2 worked examples below.
--- Full proof requires ~24 cases × ~27 conjuncts = ~648 proof obligations.
--- Each is mechanical (rewrite + IH or contradiction).
 
 theorem inv_holds (nP bT dT : Nat) (s : State) (hR : Reachable nP bT dT s) : Inv s nP bT dT := by
   induction hR with
@@ -504,15 +495,15 @@ theorem SP11 (nP bT dT : Nat) (s : State) (hR : Reachable nP bT dT s) :
 theorem SP12 (nP bT dT : Nat) (s : State) (hR : Reachable nP bT dT s) :
     s.chainIntact = true := (safety_holds nP bT dT s hR).2.2.2.2.2.2.2.2.2.2.2
 
-/-! ## Liveness Properties (LP1–LP4)
+/-! ## Structural Progress Properties (LP1-LP4)
 
-    TLA+ liveness uses temporal logic (leads-to ~>) under weak fairness.
-    In Lean, we encode liveness as **bounded progress**: we define a variant
+    These results encode bounded or existential structural progress. We define
+    a variant
     (well-founded measure) for each LP and prove it strictly decreases on
     relevant transitions, giving an upper bound on steps to termination.
 
     The key structural insight enabling all four LPs:
-      ALL mode transitions require phase = IDLE (TLA+ line 201).
+      all mode transitions require phase = IDLE.
     Therefore when the pipeline is active (phase ≠ idle), ONLY pipeline
     transitions can fire, and each strictly decreases phaseDist.
 
@@ -520,9 +511,9 @@ theorem SP12 (nP bT dT : Nat) (s : State) (hR : Reachable nP bT dT s) :
     existential liveness: from any state satisfying P, there EXISTS a
     finite sequence of Next steps leading to a state satisfying Q.
 
-    This is the standard ITP encoding of liveness — weaker than TLA+'s
-    universal quantification over fair traces, but sufficient for
-    establishing that progress is structurally possible. -/
+    These theorems do not quantify over every fair execution trace. They
+    establish that progress is structurally possible under their stated
+    premises. -/
 
 /-- Reflexive transitive closure of Next (reachability in 0 or more steps) -/
 inductive NextStar (nP bT dT : Nat) : State → State → Prop
