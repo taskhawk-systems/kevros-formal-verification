@@ -37,7 +37,8 @@ The proof builds with the pinned Lean 4.15.0 toolchain.
 
 ## Reproduction
 
-Install the pinned Lean toolchain, then run:
+Clone the repository or download its source archive, install the pinned Lean
+toolchain, then run:
 
 ```bash
 python3 verify_public_assurance.py

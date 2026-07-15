@@ -78,9 +78,18 @@ def verify_allowlist() -> None:
         if line.strip() and not line.lstrip().startswith("#")
     }
     result = run("git", "ls-files")
-    if result.returncode != 0:
-        fail(f"git ls-files failed:\n{result.stdout}")
-    tracked = {line for line in result.stdout.splitlines() if line}
+    if result.returncode == 0:
+        tracked = {line for line in result.stdout.splitlines() if line}
+    else:
+        ignored_parts = {".git", ".lake", "__pycache__"}
+        ignored_files = {"lake-manifest.json"}
+        tracked = {
+            path.relative_to(ROOT).as_posix()
+            for path in ROOT.rglob("*")
+            if path.is_file()
+            and not ignored_parts.intersection(path.relative_to(ROOT).parts)
+            and path.name not in ignored_files
+        }
     unexpected = sorted(tracked - allowed)
     missing = sorted(allowed - tracked)
     if unexpected:
